@@ -23,6 +23,10 @@ import android.hardware.face.FaceManager;
 
 import com.android.settings.biometrics.BiometricEnrollSidecar;
 
+import android.view.Surface;
+
+import androidx.annotation.Nullable;
+
 import java.util.Arrays;
 
 /**
@@ -36,9 +40,19 @@ public class FaceEnrollSidecar extends BiometricEnrollSidecar {
 
     private Intent mIntent;
 
+    @Nullable
+    private final Surface mPreviewSurface;
+
     public FaceEnrollSidecar(int[] disabledFeatures, Intent intent) {
+        this(disabledFeatures, intent, null);
+    }
+
+    /** @param previewSurface surface for the face HAL to render the enrollment preview into */
+    public FaceEnrollSidecar(int[] disabledFeatures, Intent intent,
+            @Nullable Surface previewSurface) {
         mDisabledFeatures = Arrays.copyOf(disabledFeatures, disabledFeatures.length);
         mIntent = intent;
+        mPreviewSurface = previewSurface;
     }
 
     @Override
@@ -50,8 +64,13 @@ public class FaceEnrollSidecar extends BiometricEnrollSidecar {
     @Override
     public void startEnrollment() {
         super.startEnrollment();
-        mFaceUpdater.enroll(mUserId, mToken, mEnrollmentCancel,
-                mEnrollmentCallback, mDisabledFeatures, mIntent);
+        if (mPreviewSurface != null) {
+            mFaceUpdater.enroll(mUserId, mToken, mEnrollmentCancel, mEnrollmentCallback,
+                    mDisabledFeatures, mPreviewSurface, false /* debugConsent */, mIntent);
+        } else {
+            mFaceUpdater.enroll(mUserId, mToken, mEnrollmentCancel,
+                    mEnrollmentCallback, mDisabledFeatures, mIntent);
+        }
     }
 
     private FaceManager.EnrollmentCallback mEnrollmentCallback

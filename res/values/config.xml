@@ -347,6 +347,11 @@
     <!-- Whether to support enrollment during setup wizard flow -->
     <bool name="config_suw_support_face_enroll">true</bool>
 
+    <!-- Whether the face HAL draws the face enrollment preview. When true, Settings does not open
+         the front camera itself (which would evict the HAL's camera client) and instead passes
+         its preview surface to FaceManager#enroll for the HAL to render into. -->
+    <bool name="config_face_enroll_hal_preview">false</bool>
+
     <!-- App intent -->
     <string name="config_account_intent_uri" translatable="false"></string>
 

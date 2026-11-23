@@ -26,6 +26,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.Surface;
 import android.view.View;
 import android.view.animation.AnimationUtils;
 import android.view.animation.Interpolator;
@@ -55,6 +56,7 @@ public class FaceEnrollEnrolling extends BiometricsEnrollEnrolling {
     private TextView mErrorText;
     private Interpolator mLinearOutSlowInInterpolator;
     private FaceEnrollPreviewFragment mPreviewFragment;
+    private Surface mHalPreviewSurface;
 
     private ArrayList<Integer> mDisabledFeatures = new ArrayList<>();
     private ParticleCollection.Listener mListener = new ParticleCollection.Listener() {
@@ -144,7 +146,23 @@ public class FaceEnrollEnrolling extends BiometricsEnrollEnrolling {
 
     @Override
     protected void startEnrollmentInternal() {
+        if (FaceEnrollPreviewFragment.isHalPreview(this) && mHalPreviewSurface == null) {
+            // The HAL needs the preview surface when enrollment starts, so set up the preview
+            // first and start enrolling once its surface is ready.
+            ensurePreviewFragment();
+            mPreviewFragment.setPreviewSurfaceListener(surface -> {
+                if (mHalPreviewSurface == null && !isFinishing()) {
+                    mHalPreviewSurface = surface;
+                    startEnrollmentInternal();
+                }
+            });
+            return;
+        }
         super.startEnrollmentInternal();
+        ensurePreviewFragment();
+    }
+
+    private void ensurePreviewFragment() {
         mPreviewFragment = (FaceEnrollPreviewFragment) getSupportFragmentManager()
                 .findFragmentByTag(TAG_FACE_PREVIEW);
         if (mPreviewFragment == null) {
@@ -167,7 +185,7 @@ public class FaceEnrollEnrolling extends BiometricsEnrollEnrolling {
             disabledFeatures[i] = mDisabledFeatures.get(i);
         }
 
-        return new FaceEnrollSidecar(disabledFeatures, getIntent());
+        return new FaceEnrollSidecar(disabledFeatures, getIntent(), mHalPreviewSurface);
     }
 
     @Override

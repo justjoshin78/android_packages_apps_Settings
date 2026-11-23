@@ -56,6 +56,17 @@ public class FaceEnrollPreviewFragment extends InstrumentedPreferenceFragment
     private static final int MAX_PREVIEW_WIDTH = 1920;
     private static final int MAX_PREVIEW_HEIGHT = 1080;
 
+    // Buffer size requested for a HAL-rendered preview; matches the face HAL's capture size.
+    private static final Size HAL_PREVIEW_SIZE = new Size(640, 480);
+
+    /** Receives the surface the face HAL should render the enrollment preview into. */
+    public interface PreviewSurfaceListener {
+        void onPreviewSurfaceReady(Surface surface);
+    }
+
+    private PreviewSurfaceListener mPreviewSurfaceListener;
+    private Surface mHalPreviewSurface;
+
     private Handler mHandler = new Handler(Looper.getMainLooper());
     private CameraManager mCameraManager;
     private String mCameraId;
@@ -272,12 +283,49 @@ public class FaceEnrollPreviewFragment extends InstrumentedPreferenceFragment
      * @param height The height of the texture view
      */
     private void openCamera(int width, int height) {
+        if (isHalPreview()) {
+            // The face HAL drives the front camera itself; opening it here would evict it.
+            // Hand our surface to the HAL instead.
+            provideHalPreviewSurface(width, height);
+            return;
+        }
         try {
             setUpCameraOutputs();
             mCameraManager.openCamera(mCameraId, mCameraStateCallback, mHandler);
             configureTransform(width, height);
         } catch (CameraAccessException e) {
             Log.e(TAG, "Unable to open camera", e);
+        }
+    }
+
+    /** Whether the face HAL renders the preview into a surface supplied by Settings. */
+    public static boolean isHalPreview(Context context) {
+        return context.getResources().getBoolean(R.bool.config_face_enroll_hal_preview);
+    }
+
+    private boolean isHalPreview() {
+        return isHalPreview(getContext());
+    }
+
+    public void setPreviewSurfaceListener(PreviewSurfaceListener listener) {
+        mPreviewSurfaceListener = listener;
+        if (listener != null && mHalPreviewSurface != null) {
+            listener.onPreviewSurfaceReady(mHalPreviewSurface);
+        }
+    }
+
+    private void provideHalPreviewSurface(int width, int height) {
+        if (mHalPreviewSurface != null) {
+            configureTransform(width, height);
+            return;
+        }
+        mPreviewSize = HAL_PREVIEW_SIZE;
+        SurfaceTexture texture = mTextureView.getSurfaceTexture();
+        texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
+        configureTransform(width, height);
+        mHalPreviewSurface = new Surface(texture);
+        if (mPreviewSurfaceListener != null) {
+            mPreviewSurfaceListener.onPreviewSurfaceReady(mHalPreviewSurface);
         }
     }
 
